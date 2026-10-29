@@ -55,6 +55,7 @@ app/
     scorecards.server.ts    # scorecard CRUD, draft updates, publish/unpublish, theme resolution
     responses.server.ts     # response helpers (definitionForResponse, resultUrl)
     webhooks.server.ts      # payloads, signing, enqueue (emitLeadCaptured / emitResponseCompleted), delivery
+server/index.ts             # production HTTP server (Express); rebuilds request URLs from APP_URL for proxies
 worker/index.ts             # webhook delivery loop
 scripts/                    # migrate.ts, seed.ts
 ```
