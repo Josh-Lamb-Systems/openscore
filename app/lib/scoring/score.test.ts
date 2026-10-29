@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 import { createDefaultDefinition, createQuestion } from "~/lib/scorecard/defaults";
 import type { Definition, Question, QuestionOfType, Tier } from "~/lib/scorecard/schema";
 import {
+  findConstraint,
+  firstConstraint,
   percentOf,
+  processCurveValues,
   questionMaxPoints,
   questionPoints,
   scalePoints,
@@ -188,5 +191,73 @@ describe("scoreResponse", () => {
     expect(result.overall.percent).toBe(0);
     expect(result.tierId).toBe("low");
     expect(result.categories).toEqual([]);
+  });
+});
+
+describe("process curve", () => {
+  function curve(patch: Partial<QuestionOfType<"process_curve">> = {}) {
+    return q("process_curve", {
+      id: "pc",
+      min: 1,
+      max: 10,
+      pointsMin: 0,
+      pointsMax: 10,
+      steps: [
+        { id: "leads", label: "Leads", categoryId: "sales", start: 5 },
+        { id: "calls", label: "Sales calls", categoryId: "sales", start: 5 },
+        { id: "onboard", label: "Onboarding", categoryId: "ops", start: 5 },
+        { id: "invoice", label: "Invoicing", categoryId: null, start: 5 },
+      ],
+      ...patch,
+    });
+  }
+
+  it("has a max of steps × the top of the points range", () => {
+    expect(questionMaxPoints(curve())).toBe(40);
+  });
+
+  it("fills unmoved steps with their starting values", () => {
+    expect(processCurveValues(curve(), { values: { leads: 9 } })).toEqual({ leads: 9, calls: 5, onboard: 5, invoice: 5 });
+    expect(processCurveValues(curve(), undefined)).toBeNull();
+  });
+
+  it("finds the lowest step, with ties going to the first", () => {
+    expect(findConstraint(curve(), { values: { leads: 8, calls: 7, onboard: 2, invoice: 9 } })?.id).toBe("onboard");
+    expect(findConstraint(curve(), { values: { leads: 3, calls: 3, onboard: 3, invoice: 3 } })?.id).toBe("leads");
+    expect(findConstraint(curve(), { values: { leads: 8, calls: 2, onboard: 2, invoice: 9 } })?.id).toBe("calls");
+    expect(findConstraint(curve(), undefined)).toBeNull();
+  });
+
+  it("splits points into each step's category and always into the overall score", () => {
+    const def = createDefaultDefinition("Curve");
+    def.tiers = tiers;
+    def.categories = [
+      { id: "sales", name: "Sales", description: "" },
+      { id: "ops", name: "Ops", description: "" },
+    ];
+    // Question-level category is ignored for process curves.
+    def.questions = [{ ...curve(), categoryId: "ops" }];
+    // 1–10 mapped onto 0–10: v → (v - 1) × 10/9
+    const result = scoreResponse(def, { pc: { values: { leads: 10, calls: 1, onboard: 4, invoice: 10 } } });
+    expect(result.overall).toEqual({ points: 23.33, maxPoints: 40, percent: 58 });
+    expect(result.categories).toEqual([
+      { categoryId: "sales", name: "Sales", points: 10, maxPoints: 20, percent: 50, tierId: "mid" },
+      { categoryId: "ops", name: "Ops", points: 3.33, maxPoints: 10, percent: 33, tierId: "low" },
+    ]);
+    expect(result.questions.pc).toEqual({ points: 23.33, maxPoints: 40 });
+  });
+
+  it("scores an unanswered curve as 0 but keeps its maximum", () => {
+    const def = createDefaultDefinition("Curve");
+    def.questions = [curve()];
+    expect(scoreResponse(def, {}).overall).toEqual({ points: 0, maxPoints: 40, percent: 0 });
+  });
+
+  it("exposes the first answered curve's constraint for the {{constraint}} token", () => {
+    const def = createDefaultDefinition("Curve");
+    def.questions = [{ ...curve(), id: "a" }, { ...curve(), id: "b" }];
+    expect(firstConstraint(def, {})).toBeNull();
+    expect(firstConstraint(def, { b: { values: { invoice: 1 } } })?.label).toBe("Invoicing");
+    expect(firstConstraint(def, { a: { values: { calls: 1 } }, b: { values: { invoice: 1 } } })?.label).toBe("Sales calls");
   });
 });

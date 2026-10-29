@@ -6,6 +6,7 @@ import { newId } from "~/lib/scorecard/defaults";
 import type { Question, QuestionOfType, QuestionType } from "~/lib/scorecard/schema";
 import { cn } from "~/lib/utils";
 import { convertQuestion } from "./convert";
+import { ProcessCurveSettings, ProcessCurveSteps } from "./process-curve-settings";
 import { InspectorSection, LabeledField, NumberField, RangeFields, SelectField, TextAreaField, TextField } from "./fields";
 import { replaceQuestion, useBuilder, useQuestionPatch } from "./store";
 import { TypeSelect } from "./type-select";
@@ -100,7 +101,10 @@ export function QuestionTab({ question: q, errors }: { question: Question; error
         {(q.type === "linear_scale" || q.type === "sliding_scale") && <ScaleSettings q={q} />}
         {q.type === "numeric" && <NumericSettings q={q} />}
         {q.type === "info" && <InfoSettings q={q} />}
+        {q.type === "process_curve" && <ProcessCurveSettings q={q} />}
       </InspectorSection>
+
+      {q.type === "process_curve" && <ProcessCurveSteps q={q} />}
 
       {(q.type === "linear_scale" || q.type === "sliding_scale") && (
         <InspectorSection title="Labels">
@@ -120,7 +124,7 @@ export function QuestionTab({ question: q, errors }: { question: Question; error
 
       {q.type === "numeric" && <NumericRanges q={q} />}
 
-      {q.type !== "info" && <CategorySection q={q} />}
+      {q.type !== "info" && q.type !== "process_curve" && <CategorySection q={q} />}
       <MediaSection q={q} />
     </div>
   );

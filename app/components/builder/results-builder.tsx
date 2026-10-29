@@ -5,14 +5,14 @@ import { RespondentFrame } from "~/components/respondent/frame";
 import { ResultView, type ResultScore } from "~/components/respondent/result-view";
 import { RichTextEditor } from "~/components/ui/rich-text-editor";
 import { SwitchRow } from "~/components/ui/switch";
-import type { Definition, ResultPage, Tier, TierContent } from "~/lib/scorecard/schema";
+import type { Answers, Definition, ResultPage, Tier, TierContent } from "~/lib/scorecard/schema";
 import type { BrandTokens } from "~/lib/theme";
 import { cn } from "~/lib/utils";
 import { InspectorSection, LabeledField, TextAreaField, TextField } from "./fields";
 import { useBuilder } from "./store";
 
 const EMPTY_TIER_CONTENT: TierContent = { body: "", ctaLabel: "", ctaUrl: "", ctaText: "" };
-const TOKENS = ["firstName", "lastName", "score", "tier"] as const;
+const TOKENS = ["firstName", "lastName", "score", "tier", "constraint"] as const;
 
 /** Patches the result page with an undo step (coalesced per field while typing). */
 function useResultPagePatch() {
@@ -44,12 +44,27 @@ export function sampleScore(definition: Pick<Definition, "categories">, tier: Ti
 
 export const SAMPLE_LEAD = { firstName: "Alex", lastName: "Taylor" };
 
+/** Sample Process Curve answers for the preview: a dip in the middle step, so the constraint shows. */
+export function sampleAnswers(definition: Pick<Definition, "questions">): Answers {
+  const answers: Answers = {};
+  for (const q of definition.questions) {
+    if (q.type !== "process_curve" || q.steps.length === 0) continue;
+    const low = Math.floor((q.steps.length - 1) / 2);
+    const high = Math.round(q.min + (q.max - q.min) * 0.8);
+    answers[q.id] = {
+      values: Object.fromEntries(q.steps.map((s, i) => [s.id, i === low ? q.min + 1 : high - (i % 2)])),
+    };
+  }
+  return answers;
+}
+
 // ---------------------------------------------------------------------------
 // Left pane: tiers + global settings
 // ---------------------------------------------------------------------------
 
 export function ResultSettingsPane({ scorecardId, tiers }: { scorecardId: string; tiers: Tier[] }) {
   const resultPage = useBuilder((s) => s.doc.resultPage);
+  const hasCurves = useBuilder((s) => s.doc.questions.some((q) => q.type === "process_curve"));
   const selectedTierId = useBuilder((s) => s.selectedTierId);
   const selectTier = useBuilder((s) => s.selectTier);
   const patch = useResultPagePatch();
@@ -157,6 +172,13 @@ export function ResultSettingsPane({ scorecardId, tiers }: { scorecardId: string
             checked={resultPage.showCategoryBreakdown}
             onCheckedChange={(v) => patch((rp) => ({ ...rp, showCategoryBreakdown: v }))}
           />
+          {hasCurves && (
+            <SwitchRow
+              label="Show process curve charts"
+              checked={resultPage.showProcessCurves}
+              onCheckedChange={(v) => patch((rp) => ({ ...rp, showProcessCurves: v }))}
+            />
+          )}
         </div>
         <LabeledField label="Footer text">
           {(id) => (
@@ -317,6 +339,7 @@ export function ResultCanvas({
           theme={theme}
           score={sampleScore(definition, tier)}
           lead={SAMPLE_LEAD}
+          answers={sampleAnswers(definition)}
         />
       </RespondentFrame>
     </div>

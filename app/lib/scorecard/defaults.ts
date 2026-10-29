@@ -116,6 +116,24 @@ export function createQuestion(type: QuestionType): Question {
       return { ...base(type), type, multiline: false, placeholder: "" };
     case "info":
       return { ...base(type), type, body: "", buttonLabel: "Continue" };
+    case "process_curve":
+      return {
+        ...base(type),
+        type,
+        steps: ["Leads", "Sales calls", "Onboarding", "Delivery", "Invoicing"].map((label) => ({
+          id: newId("step"),
+          label,
+          categoryId: null,
+          start: 5,
+        })),
+        min: 1,
+        max: 10,
+        pointsMin: 0,
+        pointsMax: 10,
+        topLabel: "+ Fast",
+        bottomLabel: "– Slow",
+        constraintLabel: "The constraint",
+      };
   }
 }
 
@@ -172,6 +190,7 @@ export function createDefaultDefinition(name: string): Definition {
       ),
       categoryContent: {},
       footerText: "",
+      showProcessCurves: true,
     },
   };
 }

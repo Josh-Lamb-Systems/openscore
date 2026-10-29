@@ -18,6 +18,8 @@ export const respondentStrings = {
   notAvailable: "This scorecard isn't available right now.",
   privacyPolicy: "Privacy policy",
   loading: "Calculating your results…",
+  dragPoints: "Drag each point up or down",
+  yourProcess: "Your process",
   // Public flow (start screen, lead form, errors)
   fieldRequired: "This field is required.",
   fieldTooLong: "This is too long.",

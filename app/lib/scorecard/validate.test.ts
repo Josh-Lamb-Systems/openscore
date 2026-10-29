@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDefaultDefinition, createQuestion } from "./defaults";
 import type { Tier } from "./schema";
-import { validateAnswer, validateForPublish, validateTiers } from "./validate";
+import { validateAnswer, validateForPublish, validateQuestion, validateTiers } from "./validate";
 
 const tier = (id: string, min: number, max: number): Tier => ({ id, name: id, min, max, color: "" });
 
@@ -82,5 +82,44 @@ describe("validateAnswer", () => {
     expect(validateAnswer(createQuestion("linear_scale"), { value: 11 })).toBeTruthy();
     expect(validateAnswer(createQuestion("linear_scale"), { value: 2.5 })).toBeTruthy();
     expect(validateAnswer(createQuestion("numeric"), { value: -1 })).toMatch(/at least/);
+  });
+});
+
+describe("process curve validation", () => {
+  const curve = () => {
+    const q = createQuestion("process_curve");
+    if (q.type !== "process_curve") throw new Error("unreachable");
+    return { ...q, text: "Where are you slow?" };
+  };
+
+  it("accepts the default curve", () => {
+    expect(validateQuestion(curve(), new Set())).toEqual([]);
+  });
+
+  it("flags too few or too many steps, blank labels, bad starts and missing categories", () => {
+    const q = curve();
+    expect(validateQuestion({ ...q, steps: q.steps.slice(0, 1) }, new Set()).join()).toMatch(/at least two/);
+    const many = Array.from({ length: 8 }, (_, i) => ({ ...q.steps[0], id: `s${i}` }));
+    expect(validateQuestion({ ...q, steps: many }, new Set()).join()).toMatch(/at most 7/);
+    expect(validateQuestion({ ...q, steps: [{ ...q.steps[0], label: " " }, q.steps[1]] }, new Set()).join()).toMatch(/label/);
+    expect(validateQuestion({ ...q, steps: [{ ...q.steps[0], start: 99 }, q.steps[1]] }, new Set()).join()).toMatch(/starting value/);
+    expect(validateQuestion({ ...q, steps: [{ ...q.steps[0], categoryId: "gone" }, q.steps[1]] }, new Set()).join()).toMatch(/category/);
+  });
+
+  it("requires at least one moved point when required", () => {
+    const q = curve();
+    expect(validateAnswer(q, undefined)).toMatch(/Drag at least one point/);
+    expect(validateAnswer(q, { values: {} })).toMatch(/Drag at least one point/);
+    expect(validateAnswer({ ...q, required: false }, undefined)).toBeNull();
+    expect(validateAnswer(q, { values: { [q.steps[0].id]: 3 } })).toBeNull();
+  });
+
+  it("rejects unknown steps and out-of-range or fractional values", () => {
+    const q = curve();
+    const id = q.steps[0].id;
+    expect(validateAnswer(q, { values: { nope: 3 } })).toBeTruthy();
+    expect(validateAnswer(q, { values: { [id]: 11 } })).toBeTruthy();
+    expect(validateAnswer(q, { values: { [id]: 2.5 } })).toBeTruthy();
+    expect(validateAnswer(q, { optionIds: ["x"] })).toBeTruthy();
   });
 });

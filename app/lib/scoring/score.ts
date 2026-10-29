@@ -5,6 +5,8 @@ import {
   type Answers,
   type Definition,
   type OptionQuestion,
+  type ProcessCurveQuestion,
+  type ProcessCurveStep,
   type Question,
   type Tier,
 } from "~/lib/scorecard/schema";
@@ -75,6 +77,8 @@ export function questionMaxPoints(q: Question): number {
       return Math.max(q.pointsMin, q.pointsMax);
     case "numeric":
       return Math.max(0, ...q.ranges.map((r) => r.points));
+    case "process_curve":
+      return q.steps.length * Math.max(q.pointsMin, q.pointsMax);
     default:
       return 0;
   }
@@ -98,8 +102,56 @@ export function numericPoints(q: Extract<Question, { type: "numeric" }>, value: 
   return range?.points ?? 0;
 }
 
+/**
+ * A Process Curve answer's value for each step: the answered value, or the
+ * step's starting value when the answer doesn't include it. Null when unanswered.
+ */
+export function processCurveValues(
+  q: ProcessCurveQuestion,
+  answer: Answer | undefined,
+): Record<string, number> | null {
+  if (!answer || !("values" in answer)) return null;
+  return Object.fromEntries(
+    q.steps.map((step) => {
+      const v = answer.values[step.id];
+      return [step.id, typeof v === "number" && Number.isFinite(v) ? v : step.start];
+    }),
+  );
+}
+
+/** The constraint: the step with the lowest value; ties go to the first (leftmost) step. */
+export function findConstraint(q: ProcessCurveQuestion, answer: Answer | undefined): ProcessCurveStep | null {
+  const values = processCurveValues(q, answer);
+  if (!values || q.steps.length === 0) return null;
+  return q.steps.reduce((lowest, step) => (values[step.id] < values[lowest.id] ? step : lowest));
+}
+
+/**
+ * How a question's points split across categories. Most questions contribute one
+ * entry (their own category); a Process Curve contributes one entry per step.
+ */
+export function questionContributions(
+  q: Question,
+  answer: Answer | undefined,
+): { categoryId: string | null; points: number; maxPoints: number }[] {
+  if (!isScoredQuestion(q)) return [];
+  if (q.type === "process_curve") {
+    const values = processCurveValues(q, answer);
+    const stepMax = Math.max(q.pointsMin, q.pointsMax);
+    return q.steps.map((step) => ({
+      categoryId: step.categoryId,
+      points: values ? Math.min(Math.max(scalePoints(q, values[step.id]), 0), stepMax) : 0,
+      maxPoints: stepMax,
+    }));
+  }
+  return [{ categoryId: q.categoryId, points: questionPoints(q, answer), maxPoints: questionMaxPoints(q) }];
+}
+
 export function questionPoints(q: Question, answer: Answer | undefined): number {
   if (!answer || !isScoredQuestion(q)) return 0;
+  if (q.type === "process_curve") {
+    return questionContributions(q, answer).reduce((sum, c) => sum + c.points, 0);
+  }
   const max = questionMaxPoints(q);
   let pts = 0;
 
@@ -137,6 +189,16 @@ export function tierForPercent(tiers: Tier[], percent: number): Tier | null {
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
+/** The constraint of the first answered Process Curve in the definition (drives `{{constraint}}`). */
+export function firstConstraint(definition: Definition, answers: Answers): ProcessCurveStep | null {
+  for (const q of definition.questions) {
+    if (q.type !== "process_curve") continue;
+    const step = findConstraint(q, answers[q.id]);
+    if (step) return step;
+  }
+  return null;
+}
+
 export function scoreResponse(definition: Definition, answers: Answers): ScoreResult {
   const questions: ScoreResult["questions"] = {};
   const byCategory = new Map<string, { points: number; maxPoints: number }>();
@@ -145,17 +207,21 @@ export function scoreResponse(definition: Definition, answers: Answers): ScoreRe
 
   for (const q of definition.questions) {
     if (!isScoredQuestion(q)) continue;
-    const qMax = questionMaxPoints(q);
-    const qPts = questionPoints(q, answers[q.id]);
+    let qPts = 0;
+    let qMax = 0;
+    for (const part of questionContributions(q, answers[q.id])) {
+      qPts += part.points;
+      qMax += part.maxPoints;
+      if (part.categoryId) {
+        const c = byCategory.get(part.categoryId) ?? { points: 0, maxPoints: 0 };
+        c.points += part.points;
+        c.maxPoints += part.maxPoints;
+        byCategory.set(part.categoryId, c);
+      }
+    }
     questions[q.id] = { points: round2(qPts), maxPoints: qMax };
     points += qPts;
     maxPoints += qMax;
-    if (q.categoryId) {
-      const c = byCategory.get(q.categoryId) ?? { points: 0, maxPoints: 0 };
-      c.points += qPts;
-      c.maxPoints += qMax;
-      byCategory.set(q.categoryId, c);
-    }
   }
 
   const overallPercent = percentOf(points, maxPoints);

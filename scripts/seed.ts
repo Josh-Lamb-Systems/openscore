@@ -120,6 +120,26 @@ function buildDefinition(): Definition {
       options: [opt("Strongly disagree", 0), opt("Disagree", 1), opt("Agree", 2), opt("Strongly agree", 3)],
     },
     {
+      ...common(newId("q"), "Find the constraint: how fast does each step of your process move?", null),
+      showInstruction: true,
+      instruction: "Drag each point up or down. Be honest; the slowest step limits everything after it.",
+      type: "process_curve",
+      steps: [
+        { id: newId("step"), label: "Leads", categoryId: cat.pipeline, start: 5 },
+        { id: newId("step"), label: "Sales calls", categoryId: cat.process, start: 5 },
+        { id: newId("step"), label: "Onboarding", categoryId: cat.team, start: 5 },
+        { id: newId("step"), label: "Delivery", categoryId: cat.team, start: 5 },
+        { id: newId("step"), label: "Invoicing", categoryId: cat.process, start: 5 },
+      ],
+      min: 1,
+      max: 10,
+      pointsMin: 0,
+      pointsMax: 3,
+      topLabel: "+ Fast",
+      bottomLabel: "– Slow",
+      constraintLabel: "The constraint",
+    },
+    {
       ...common(newId("q"), "What is the single biggest obstacle to growing your sales right now?", null, false),
       type: "open_text",
       multiline: true,
@@ -131,7 +151,7 @@ function buildDefinition(): Definition {
   const tierContent = {
     [low.id]: {
       body: html(
-        "<p>Your sales engine is running on effort rather than system. That's normal for growing teams, and it means there are quick wins on the table.</p><p>Start by writing down how a deal moves from first call to signature, then make sure every rep follows it.</p>",
+        "<p>Your sales engine is running on effort rather than system. That's normal for growing teams, and it means there are quick wins on the table.</p><p>Start with your biggest constraint, <strong>{{constraint}}</strong>: write down how work moves through it, then make sure everyone follows that.</p>",
       ),
       ctaLabel: "Book a strategy call",
       ctaUrl: "https://example.com/strategy-call",
@@ -139,7 +159,7 @@ function buildDefinition(): Definition {
     },
     [mid.id]: {
       body: html(
-        "<p>You have solid foundations, but growth still depends on a few people and a few good months. The next step is consistency.</p><p>Tighten qualification, coach to the process and forecast from data rather than gut feel.</p>",
+        "<p>You have solid foundations, but growth still depends on a few people and a few good months. The next step is consistency.</p><p>Your constraint right now is <strong>{{constraint}}</strong>. Improving anything else won't speed you up until that step does.</p>",
       ),
       ctaLabel: "Book a strategy call",
       ctaUrl: "https://example.com/strategy-call",

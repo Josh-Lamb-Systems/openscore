@@ -34,6 +34,10 @@ export function convertQuestion(q: Question, type: QuestionType): Question {
     (next as { options: ChoiceOption[] }).options = q.options.map((o) => ({ ...o }));
     if ("randomize" in q && "randomize" in next) (next as { randomize: boolean }).randomize = q.randomize;
   }
+  // A process curve scores per step, so carry the question's category onto every step.
+  if (next.type === "process_curve" && q.categoryId) {
+    next.steps = next.steps.map((s) => ({ ...s, categoryId: q.categoryId }));
+  }
   return next;
 }
 
@@ -46,6 +50,9 @@ export function duplicateQuestion(q: Question): Question {
   }
   if (copy.type === "numeric") {
     copy.ranges = copy.ranges.map((r) => ({ ...r, id: newId("rng") }));
+  }
+  if (copy.type === "process_curve") {
+    copy.steps = copy.steps.map((s) => ({ ...s, id: newId("step") }));
   }
   return copy;
 }

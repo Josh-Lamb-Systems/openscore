@@ -9,6 +9,7 @@ import {
   type LucideIcon,
   Rows3,
   SlidersHorizontal,
+  Spline,
   SquareCheckBig,
   Type,
 } from "lucide-react";
@@ -27,6 +28,7 @@ const ICONS: Record<QuestionType, LucideIcon> = {
   open_text: Type,
   image_buttons: ImageIcon,
   info: Info,
+  process_curve: Spline,
 };
 
 /** Small brand-coloured icon for a question type (list rows, type select). */

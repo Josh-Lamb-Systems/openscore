@@ -9,6 +9,8 @@ import {
   type Tier,
 } from "./schema";
 
+export const MAX_PROCESS_STEPS = 7;
+
 export interface ValidationIssue {
   /** Where the problem is, e.g. "questions.q_abc" or "tiers". Used to link to the editor. */
   path: string;
@@ -94,6 +96,18 @@ export function validateQuestion(q: Question, categoryIds: Set<string>): string[
         errors.push("A scoring range starts after it ends.");
       }
       break;
+    case "process_curve":
+      if (q.steps.length < 2) errors.push("Add at least two steps.");
+      if (q.steps.length > MAX_PROCESS_STEPS) errors.push(`Use at most ${MAX_PROCESS_STEPS} steps.`);
+      if (q.steps.some((s) => !s.label.trim())) errors.push("Every step needs a label.");
+      if (q.min >= q.max) errors.push("The scale minimum must be lower than the maximum.");
+      if (q.steps.some((s) => s.start < q.min || s.start > q.max)) {
+        errors.push("Every starting value must be inside the scale.");
+      }
+      if (q.steps.some((s) => s.categoryId && !categoryIds.has(s.categoryId))) {
+        errors.push("A step's category no longer exists.");
+      }
+      break;
   }
   return errors;
 }
@@ -152,10 +166,15 @@ export function validateAnswer(q: Question, answer: Answer | undefined): string 
     !answer ||
     ("optionIds" in answer && answer.optionIds.length === 0) ||
     ("text" in answer && !answer.text.trim()) ||
-    ("value" in answer && !Number.isFinite(answer.value));
+    ("value" in answer && !Number.isFinite(answer.value)) ||
+    ("values" in answer && Object.keys(answer.values).length === 0);
 
   if (q.type === "info") return null;
-  if (empty) return q.required ? "This question is required." : null;
+  if (empty) {
+    if (!q.required) return null;
+    // The curve's answer is only created once a point is moved, so "required" means "move at least one".
+    return q.type === "process_curve" ? "Drag at least one point to answer." : "This question is required.";
+  }
 
   if (isOptionQuestion(q)) {
     if (!("optionIds" in answer)) return "Invalid answer.";
@@ -184,6 +203,14 @@ export function validateAnswer(q: Question, answer: Answer | undefined): string 
       if (q.min != null && answer.value < q.min) return `Enter a number of at least ${q.min}.`;
       if (q.max != null && answer.value > q.max) return `Enter a number no greater than ${q.max}.`;
       return null;
+    case "process_curve": {
+      if (!("values" in answer)) return "Invalid answer.";
+      const stepIds = new Set(q.steps.map((s) => s.id));
+      for (const [stepId, v] of Object.entries(answer.values)) {
+        if (!stepIds.has(stepId) || !Number.isInteger(v) || v < q.min || v > q.max) return "Invalid answer.";
+      }
+      return null;
+    }
   }
   return null;
 }
