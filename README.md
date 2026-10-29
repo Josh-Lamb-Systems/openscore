@@ -32,6 +32,13 @@ docker compose --profile app up -d --build
 Open `APP_URL` and create the first admin account on the setup page. Put a TLS-terminating reverse proxy
 (Caddy, Traefik, nginx) in front of port 3000 for production.
 
+- **`APP_URL` must be the exact public URL people use** (scheme, host and any port), e.g. `https://scores.example.com`.
+  The server treats it as the request origin, so form submissions from any other origin are rejected. If they are,
+  the `web` log says which origin to set.
+- **Set `POSTGRES_PASSWORD` in `.env` before the first `up`** (`openssl rand -hex 24`; hex avoids characters that break
+  the connection URL). Postgres only applies it when the data volume is first created. To change it later, run
+  `ALTER USER openscore PASSWORD '...'` in the `postgres` container, not just in `.env`.
+
 | Service    | Purpose                                                    |
 | ---------- | ---------------------------------------------------------- |
 | `postgres` | Database (named volume `postgres-data`)                    |
