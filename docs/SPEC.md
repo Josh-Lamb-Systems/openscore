@@ -173,8 +173,9 @@ result page.
   `isTest = true`.
 
 ### Embedding
-- Public routes (`/s/*`, `/embed/*`) send `Content-Security-Policy: frame-ancestors *`. Admin routes
-  send `frame-ancestors 'none'`.
+- Public routes (`/s/*`, `/embed/*`) send no framing restriction, so they embed anywhere, including local
+  `file://` test pages, which `frame-ancestors *` would block. Admin routes send `frame-ancestors 'none'`
+  and `X-Frame-Options: DENY`.
 - Snippet: `<iframe>` plus a small `/embed.js` that listens for `postMessage` height events to
   auto-resize.
 

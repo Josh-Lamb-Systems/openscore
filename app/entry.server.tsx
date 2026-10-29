@@ -22,7 +22,9 @@ function isFrameablePath(pathname: string): boolean {
 
 function setFrameHeaders(request: Request, headers: Headers) {
   if (isFrameablePath(new URL(request.url).pathname)) {
-    headers.set("Content-Security-Policy", "frame-ancestors *");
+    // No framing restriction at all. `frame-ancestors *` would still block
+    // non-network parents such as a local file:// test page.
+    headers.delete("Content-Security-Policy");
     headers.delete("X-Frame-Options");
   } else {
     headers.set("Content-Security-Policy", "frame-ancestors 'none'");
