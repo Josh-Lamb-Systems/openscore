@@ -1,9 +1,11 @@
 import { respondentStrings as t } from "~/lib/respondent-strings";
-import type { Definition } from "~/lib/scorecard/schema";
-import type { CategoryScore } from "~/lib/scoring/score";
+import type { Answers, Definition } from "~/lib/scorecard/schema";
+import { interpolate, interpolateHtml } from "~/lib/scorecard/tokens";
+import { firstConstraint, processCurveValues, type CategoryScore } from "~/lib/scoring/score";
 import type { BrandTokens } from "~/lib/theme";
 import { cn } from "~/lib/utils";
 import { BrandLogo } from "./frame";
+import { ProcessCurveChart } from "./process-curve";
 
 export interface ResultScore {
   overallPercent: number;
@@ -17,18 +19,11 @@ export interface ResultViewProps {
   score: ResultScore;
   /** Lead fields keyed by field key (firstName, lastName, email, custom_*). */
   lead: Record<string, string | boolean>;
+  /** The respondent's answers (for Process Curve charts and the {{constraint}} token). */
+  answers?: Answers;
   className?: string;
   /** Show the logo placeholder when the theme has no logo (builder preview). Public pages pass false. */
   showLogoPlaceholder?: boolean;
-}
-
-/** Replaces {{firstName}}, {{lastName}}, {{score}} and {{tier}}; unknown or empty tokens become "". */
-export function interpolate(template: string, vars: Record<string, string>): string {
-  return template
-    .replace(/\{\{\s*(\w+)\s*\}\}/g, (_, key: string) => vars[key] ?? "")
-    .replace(/\s+([,.!?])/g, "$1")
-    .replace(/,\s*$/, "")
-    .trim();
 }
 
 function ScoreGauge({ percent, color, label }: { percent: number; color: string; label: string }) {
@@ -63,7 +58,15 @@ function ScoreGauge({ percent, color, label }: { percent: number; color: string;
  * The structured result page (docs/SPEC.md §6). Used by the public result route
  * and the result page builder preview.
  */
-export function ResultView({ definition, theme, score, lead, className, showLogoPlaceholder = true }: ResultViewProps) {
+export function ResultView({
+  definition,
+  theme,
+  score,
+  lead,
+  answers = {},
+  className,
+  showLogoPlaceholder = true,
+}: ResultViewProps) {
   const { resultPage, tiers, categories } = definition;
   const tier = tiers.find((x) => x.id === score.tierId) ?? null;
   const content = tier ? resultPage.tierContent[tier.id] : undefined;
@@ -72,7 +75,13 @@ export function ResultView({ definition, theme, score, lead, className, showLogo
     lastName: String(lead.lastName ?? ""),
     score: `${score.overallPercent}%`,
     tier: tier?.name ?? "",
+    constraint: firstConstraint(definition, answers)?.label ?? "",
   };
+  const curves = resultPage.showProcessCurves
+    ? definition.questions.flatMap((q) =>
+        q.type === "process_curve" && processCurveValues(q, answers[q.id]) ? [q] : [],
+      )
+    : [];
   const ctaHref = content?.ctaUrl ? (/^https?:\/\//i.test(content.ctaUrl) ? content.ctaUrl : `https://${content.ctaUrl}`) : null;
 
   return (
@@ -95,10 +104,19 @@ export function ResultView({ definition, theme, score, lead, className, showLogo
                 {tier.name}
               </p>
             )}
-            {content?.body && <div className="os-prose mt-4 text-lg" dangerouslySetInnerHTML={{ __html: content.body }} />}
+            {content?.body && (
+              <div className="os-prose mt-4 text-lg" dangerouslySetInnerHTML={{ __html: interpolateHtml(content.body, vars) }} />
+            )}
           </div>
         </div>
       </section>
+
+      {curves.map((q) => (
+        <section key={q.id} className="mt-8 rounded-[calc(var(--os-radius)*2)] bg-[var(--os-surface)] p-6 shadow-sm sm:p-10">
+          <h2 className="mb-6 text-2xl font-semibold">{q.text || t.yourProcess}</h2>
+          <ProcessCurveChart question={q} values={processCurveValues(q, answers[q.id])} />
+        </section>
+      ))}
 
       {resultPage.showCategoryBreakdown && score.categoryScores.length > 0 && (
         <section className="mt-8 rounded-[calc(var(--os-radius)*2)] bg-[var(--os-surface)] p-6 shadow-sm sm:p-10">
@@ -117,7 +135,9 @@ export function ResultView({ definition, theme, score, lead, className, showLogo
                   <div className="h-3 overflow-hidden rounded-full bg-current/10">
                     <div className="h-3 rounded-full" style={{ width: `${cs.percent}%`, backgroundColor: catTier?.color || theme.primaryColor }} />
                   </div>
-                  {html && <div className="os-prose mt-3 opacity-90" dangerouslySetInnerHTML={{ __html: html }} />}
+                  {html && (
+                    <div className="os-prose mt-3 opacity-90" dangerouslySetInnerHTML={{ __html: interpolateHtml(html, vars) }} />
+                  )}
                 </div>
               );
             })}
@@ -127,7 +147,7 @@ export function ResultView({ definition, theme, score, lead, className, showLogo
 
       {content && (content.ctaLabel || content.ctaText) && (
         <section className="mt-8 rounded-[calc(var(--os-radius)*2)] bg-[var(--os-accent)] px-6 py-12 text-center text-white sm:px-10">
-          {content.ctaText && <p className="mx-auto mb-6 max-w-2xl text-2xl font-semibold">{content.ctaText}</p>}
+          {content.ctaText && <p className="mx-auto mb-6 max-w-2xl text-2xl font-semibold">{interpolate(content.ctaText, vars)}</p>}
           {content.ctaLabel && (
             <a
               href={ctaHref ?? undefined}

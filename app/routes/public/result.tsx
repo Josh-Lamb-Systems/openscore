@@ -38,6 +38,7 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     definition,
     theme,
     lead: response.lead,
+    answers: response.answers,
     score: {
       overallPercent: response.overallPercent ?? 0,
       tierId: response.tierId,
@@ -58,7 +59,7 @@ export function meta({ loaderData }: Route.MetaArgs) {
 }
 
 export default function PublicResult({ loaderData }: Route.ComponentProps) {
-  const { embed, isTest, scorecardId, definition, theme, lead, score } = loaderData;
+  const { embed, isTest, scorecardId, definition, theme, lead, answers, score } = loaderData;
   const rootRef = useEmbedResize<HTMLDivElement>(embed);
   return (
     <div ref={rootRef} className={cn("flex flex-col", !embed && "min-h-dvh")}>
@@ -69,6 +70,7 @@ export default function PublicResult({ loaderData }: Route.ComponentProps) {
           theme={theme}
           score={score}
           lead={lead}
+          answers={answers}
           showLogoPlaceholder={false}
           className={embed ? "py-6" : "sm:py-12"}
         />

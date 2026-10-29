@@ -13,6 +13,7 @@ export const QUESTION_TYPES: { type: QuestionType; label: string; description: s
   { type: "open_text", label: "Open Text", description: "Free-text answer (not scored)" },
   { type: "image_buttons", label: "Image Button", description: "Pick an option shown as an image" },
   { type: "info", label: "Info Screen", description: "Show content between questions (not scored)" },
+  { type: "process_curve", label: "Process Curve", description: "Rate each step of a process and find the constraint" },
 ];
 
 export function questionTypeLabel(type: QuestionType): string {

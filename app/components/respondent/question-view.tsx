@@ -5,6 +5,7 @@ import { isOptionQuestion, type Answer, type ChoiceOption, type Question } from 
 import { isMultiSelect, visibleOptions } from "~/lib/scoring/score";
 import { cn } from "~/lib/utils";
 import { ThemedButton } from "./frame";
+import { ProcessCurveChart } from "./process-curve";
 
 export interface QuestionViewProps {
   question: Question;
@@ -260,6 +261,16 @@ export function QuestionView({
 
         {q.type === "info" && q.body && (
           <div className="os-prose max-w-2xl text-lg" dangerouslySetInnerHTML={{ __html: q.body }} />
+        )}
+
+        {q.type === "process_curve" && (
+          <ProcessCurveChart
+            question={q}
+            values={value && "values" in value ? value.values : null}
+            onChange={(values) => onChange({ values })}
+            disabled={disabled}
+            className="max-w-4xl"
+          />
         )}
       </div>
 

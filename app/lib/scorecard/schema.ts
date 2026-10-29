@@ -143,6 +143,31 @@ export const infoScreenQuestionSchema = z.object({
   buttonLabel: z.string().default("Continue"),
 });
 
+export const processCurveStepSchema = z.object({
+  id,
+  label: z.string(),
+  /** Points for this step go to this category (the question-level categoryId is ignored). */
+  categoryId: z.string().nullable().default(null),
+  start: z.number().int(),
+});
+
+/**
+ * "Find the constraint" chart: the respondent rates how fast each step of a
+ * process moves; the lowest step is the constraint. See docs/SPEC.md §4.1.
+ */
+export const processCurveQuestionSchema = z.object({
+  ...questionBase,
+  type: z.literal("process_curve"),
+  steps: z.array(processCurveStepSchema),
+  min: z.number().int(),
+  max: z.number().int(),
+  pointsMin: points,
+  pointsMax: points,
+  topLabel: z.string().default("+ Fast"),
+  bottomLabel: z.string().default("– Slow"),
+  constraintLabel: z.string().default("The constraint"),
+});
+
 export const questionSchema = z.discriminatedUnion("type", [
   yesNoQuestionSchema,
   choiceButtonsQuestionSchema,
@@ -155,6 +180,7 @@ export const questionSchema = z.discriminatedUnion("type", [
   numericQuestionSchema,
   openTextQuestionSchema,
   infoScreenQuestionSchema,
+  processCurveQuestionSchema,
 ]);
 
 export const categorySchema = z.object({
@@ -225,6 +251,8 @@ export const resultPageSchema = z.object({
   /** Keyed by category id, then tier id → rich text (sanitised HTML). */
   categoryContent: z.record(z.string(), z.record(z.string(), z.string())).default({}),
   footerText: z.string().default(""),
+  /** Show the respondent's chart for each answered Process Curve question. */
+  showProcessCurves: z.boolean().default(true),
 });
 
 export const definitionSchema = z.object({
@@ -242,6 +270,8 @@ export type Question = z.infer<typeof questionSchema>;
 export type QuestionType = Question["type"];
 export type ChoiceOption = z.infer<typeof choiceOptionSchema>;
 export type NumericRange = z.infer<typeof numericRangeSchema>;
+export type ProcessCurveStep = z.infer<typeof processCurveStepSchema>;
+export type ProcessCurveQuestion = z.infer<typeof processCurveQuestionSchema>;
 export type Category = z.infer<typeof categorySchema>;
 export type Tier = z.infer<typeof tierSchema>;
 export type LeadField = z.infer<typeof leadFieldSchema>;
@@ -281,6 +311,8 @@ export const answerSchema = z.union([
   z.object({ optionIds: z.array(z.string()) }),
   z.object({ value: z.number() }),
   z.object({ text: z.string() }),
+  /** Process Curve: value per step id. */
+  z.object({ values: z.record(z.string(), z.number()) }),
 ]);
 
 export type Answer = z.infer<typeof answerSchema>;

@@ -112,9 +112,27 @@ Influence Scorecard") → builder. Scratch-only in v1 (no templates or AI).
 | Numeric | number, optional min/max/unit | points from configured value ranges |
 | Open Text | string (short or long) | unscored |
 | Info Screen | none (content + continue button) | unscored, not counted in progress |
+| Process Curve | integer in [min, max] **per step** (2–7 named steps) | each step mapped onto the points range, into its own category (§4.1) |
 
 Common options: `required`, `showInstruction` + instruction text, `randomiseAnswers` (choice types),
 media (image or video URL), `categoryId` (optional).
+
+### 4.1 Process Curve
+
+A "find the constraint" chart. The steps of a process (e.g. Leads → Sales calls → Onboarding →
+Delivery → Invoicing) run left to right. The respondent drags each step's point between a bottom
+label ("– Slow") and a top label ("+ Fast"). A smooth curve (monotone, so it never overshoots a
+point) joins the points, shaded against a dotted midline. The lowest step is called out with the
+constraint label ("▼ The constraint").
+
+- **Owner settings:** 2–7 steps (label, optional category, starting value), integer scale min/max,
+  points range, top and bottom labels, and the constraint label.
+- **Answer:** `{ values: { [stepId]: number } }`. Created on the first drag or arrow-key press, then
+  holds every step (unmoved steps keep their starting values). A **required** curve can't be
+  submitted until the respondent has moved at least one point.
+- **Constraint:** the step with the lowest value. **Ties go to the first** (leftmost) of the tied steps.
+- **Accessibility:** every point is a `role="slider"` handle (arrow keys, Home/End), and points
+  snap to integers.
 
 ---
 
@@ -124,7 +142,9 @@ Pure, deterministic TypeScript module (`scoring/`), fully unit-tested, used by b
 builder preview.
 
 - Each scored question belongs to **at most one category**. Uncategorised scored questions count
-  toward the overall score only.
+  toward the overall score only. **Exception: Process Curve.** Each step is scored like its own
+  linear-scale item (`maxPoints = steps × top of the points range`). Its points go to that step's
+  category, if any, and always to the overall score. The question-level category is ignored.
 - `maxPoints(question)`: the highest option for single-select types; the sum of positive options
   (respecting max selections) for checkboxes; the top of the points range for scales; the highest
   range value for numeric.
@@ -144,11 +164,15 @@ builder preview.
 
 One result page per scorecard. Content varies by tier:
 
-1. Header: logo, headline (supports `{{firstName}}`), overall score gauge (%), tier name.
+1. Header: logo, headline, overall score gauge (%), tier name. Tokens `{{firstName}}`, `{{lastName}}`,
+   `{{score}}`, `{{tier}}` and `{{constraint}}` work in the headline, tier body, CTA text and category copy.
+   Values are HTML-escaped. `{{constraint}}` is the constraint step of the first answered Process Curve.
 2. Tier body: rich text per tier.
 3. Category breakdown: one bar per category (%), with per-category, per-tier rich text.
-4. CTA block: per-tier button label + URL (e.g. "Book a call"), optional secondary text.
-5. Footer.
+4. Process curves: the respondent's own chart for each answered Process Curve, with the constraint
+   marked (toggle: `showProcessCurves`, default on).
+5. CTA block: per-tier button label + URL (e.g. "Book a call"), optional secondary text.
+6. Footer.
 
 Result URL: `/s/:slug/r/:resultToken`. The token is an unguessable random ID; the page is
 shareable and `noindex`.

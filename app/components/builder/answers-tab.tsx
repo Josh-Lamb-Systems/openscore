@@ -42,7 +42,7 @@ export function AnswersTab({ question: q, errors }: { question: Question; errors
         )}
       </InspectorSection>
       {isOptionQuestion(q) && (q.type === "yes_no" ? <YesNoAnswers q={q} /> : <OptionAnswers q={q} />)}
-      {(q.type === "linear_scale" || q.type === "sliding_scale") && <ScaleMapping q={q} />}
+      {(q.type === "linear_scale" || q.type === "sliding_scale" || q.type === "process_curve") && <ScaleMapping q={q} />}
       {q.type === "numeric" && <NumericMapping q={q} />}
     </div>
   );
@@ -235,9 +235,13 @@ function OptionRow({
   );
 }
 
-function ScaleMapping({ q }: { q: QuestionOfType<"linear_scale"> | QuestionOfType<"sliding_scale"> }) {
+function ScaleMapping({
+  q,
+}: {
+  q: QuestionOfType<"linear_scale"> | QuestionOfType<"sliding_scale"> | QuestionOfType<"process_curve">;
+}) {
   const rows: number[] = [];
-  if (q.type === "linear_scale" && q.max > q.min && q.max - q.min <= 20) {
+  if ((q.type === "linear_scale" || q.type === "process_curve") && q.max > q.min && q.max - q.min <= 20) {
     for (let v = q.min; v <= q.max; v++) rows.push(v);
   } else if (q.max > q.min) {
     rows.push(q.min, q.min + (q.max - q.min) / 4, q.min + (q.max - q.min) / 2, q.min + (3 * (q.max - q.min)) / 4, q.max);
@@ -245,8 +249,11 @@ function ScaleMapping({ q }: { q: QuestionOfType<"linear_scale"> | QuestionOfTyp
   return (
     <InspectorSection title="Points">
       <p className="text-sm text-gray-700">
-        The answer is mapped linearly onto the points range: {q.min} scores {q.pointsMin}, {q.max} scores {q.pointsMax}. Change
-        the ranges on the Question tab.
+        {q.type === "process_curve" ? "Each step's value" : "The answer"} is mapped linearly onto the points range: {q.min}{" "}
+        scores {q.pointsMin}, {q.max} scores {q.pointsMax}.
+        {q.type === "process_curve" &&
+          ` With ${q.steps.length} steps the question is worth up to ${q.steps.length * Math.max(q.pointsMin, q.pointsMax)} points, split across the steps' categories.`}{" "}
+        Change the ranges on the Question tab.
       </p>
       {rows.length > 0 && (
         <table className="w-full text-sm">
