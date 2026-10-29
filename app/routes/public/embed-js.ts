@@ -77,7 +77,6 @@ export function loader() {
       "Content-Type": "application/javascript; charset=utf-8",
       "Cache-Control": "public, max-age=3600",
       "Access-Control-Allow-Origin": "*",
-      "Content-Security-Policy": "frame-ancestors *",
       "X-Content-Type-Options": "nosniff",
     },
   });
