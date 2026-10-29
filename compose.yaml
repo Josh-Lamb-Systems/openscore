@@ -1,0 +1,53 @@
+# Self-hosting: `docker compose up -d` starts Postgres, the web app and the webhook worker.
+# Local development: `docker compose up -d postgres` and run the app with `npm run dev`.
+name: openscore
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: openscore
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-openscore}
+      POSTGRES_DB: openscore
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-54329}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U openscore"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  web:
+    image: ${OPENSCORE_IMAGE:-ghcr.io/josh-lamb-systems/openscore:latest}
+    build: .
+    profiles: [app]
+    restart: unless-stopped
+    command: ["npm", "run", "start"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://openscore:${POSTGRES_PASSWORD:-openscore}@postgres:5432/openscore
+    ports:
+      - "${PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  worker:
+    image: ${OPENSCORE_IMAGE:-ghcr.io/josh-lamb-systems/openscore:latest}
+    build: .
+    profiles: [app]
+    restart: unless-stopped
+    command: ["npm", "run", "worker"]
+    env_file: .env
+    environment:
+      DATABASE_URL: postgres://openscore:${POSTGRES_PASSWORD:-openscore}@postgres:5432/openscore
+      RUN_MIGRATIONS: "false"
+    depends_on:
+      web:
+        condition: service_started
+
+volumes:
+  postgres-data:
